@@ -1,56 +1,68 @@
 name: CI-CD Pipeline
 
+# Este pipeline se ejecuta automáticamente cuando haces push al branch 'master'
 on:
   push:
     branches: [ master ]
 
 jobs:
+# Primer trabajo: construir la aplicación Java
   build:
     name: Application Build
     runs-on: ubuntu-latest
 
     steps:
+    # Paso 1: Descargar el código del repositorio
     - name: Descargar código
       uses: actions/checkout@v3
-
+      
+    # Paso 2: Instalar la versión correcta de Java para poder compilar la aplicación
     - name: Instalar Java
       uses: actions/setup-java@v3
       with:
         java-version: '17'
         distribution: 'temurin'
 
+    # Paso 3: Compilar la app Java y generar el archivo .jar (sin correr pruebas)
     - name: Construir app Java
       run: mvn clean package -DskipTests
 
+    # Paso 4: Guardar el archivo .jar como artefacto del pipeline (para usarlo después [Dockerfile])
     - name: Guardar archivo .jar
       uses: actions/upload-artifact@v4
       with:
         name: app-jar
         path: target/*.jar
 
+  # Segundo trabajo: construir la imagen Docker y subirla a DockerHub
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
     needs: build
 
     steps:
+    # Paso 1: Descargar nuevamente el código del repositorio
     - name: Descargar código
       uses: actions/checkout@v3
-
+      
+    # Paso 2: Descargar el archivo .jar generado en el paso anterior
     - name: Descargar archivo .jar
       uses: actions/download-artifact@v4
       with:
         name: app-jar
         path: target
 
+    # Paso 3: Iniciar sesión en DockerHub con las credenciales guardadas como secretos en el fork
     - name: Iniciar sesión en DockerHub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    # Paso 4: Crear una imagen Docker con el archivo .jar usando el Dockerfile
     - name: Crear imagen Docker
       run: docker build -t duvangt/julio-salazar:v1.0 .
-
+      
+    # Paso 5: Subir la imagen creada a DockerHub
     - name: Subir imagen a DockerHub
       run: docker push duvangt/julio-salazar:v1.0
